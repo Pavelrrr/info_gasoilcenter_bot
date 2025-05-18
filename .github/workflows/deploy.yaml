@@ -1,0 +1,44 @@
+name: Deploy to Yandex Cloud Functions
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Записываем содержимое key.json из секрета в файл
+      - name: Write key.json from secret
+        run: |
+          echo "${{ secrets.YDB_ADMIN }}" > key.json
+
+      # (Опционально) Убедитесь, что requirements.txt и main.py есть в репозитории
+
+      # Деплой функции с помощью yc-actions/yc-sls-function
+      - name: Deploy Function
+        uses: yc-actions/yc-sls-function@v3
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_FUNCTIONS_JSON_CRED}}
+          folder-id: ${{ secrets.FOLDER_ID }}
+          function-name: ${{ secrets.FUNCTION_NAME }}
+          runtime: 'python311'
+          memory: '256Mb'
+          entrypoint: 'main.handler'
+          environment: |
+            TELEGRAM_TOKEN=${{ secrets.INFO_GASOILCENTER_BOT_TOKEN }}
+            DRILLING_SHEET_ID=${{ secrets.DRILLING_SHEET_ID }}
+            COMPLETION_SHEET_ID=${{ secrets.COMPLETION_SHEET_ID }}
+            CREDS_URL=${{ secrets.GOOGLE_CLOUD_REGIONAL_JSON }}
+            YDB_ENDPOINT=${{ secrets.YDB_ENDPOINT }}
+            YDB_DATABASE=${{ secrets.YDB_DATABASE }}
+            YDB_SERVICE_ACCOUNT_KEY_FILE_CREDENTIALS=key.json
+          include: |
+            main.py
+            requirements.txt
+            key.json
