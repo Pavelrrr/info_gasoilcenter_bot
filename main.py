@@ -13,7 +13,10 @@ SHEET_IDS = {
     "drilling": os.environ.get("DRILLING_SHEET_ID"),
     "completion": os.environ.get("COMPLETION_SHEET_ID")
 }
-SHEET_NAME = "08:00"
+SHEET_NAMES = {
+    "drilling": "08:00",
+    "completion": "08:00 ОСВ"  # Изменено название вкладки для режима освоения
+}
 
 # --- YDB параметры ---
 YDB_ENDPOINT = os.environ.get("YDB_ENDPOINT")
@@ -73,27 +76,29 @@ async def get_creds_from_object_storage():
     )
     return creds
 
-async def get_well_list(sheet_id):
+async def get_well_list(sheet_id, mode):
     creds = await get_creds_from_object_storage()
+    sheet_name = SHEET_NAMES[mode]  # Используем соответствующее название вкладки
     async with Aiogoogle(service_account_creds=creds) as aiogoogle:
         sheets_api = await aiogoogle.discover("sheets", "v4")
         result = await aiogoogle.as_service_account(
             sheets_api.spreadsheets.values.get(
                 spreadsheetId=sheet_id,
-                range=f"{SHEET_NAME}!A2:A"
+                range=f"{sheet_name}!A2:A"
             )
         )
         wells = [row[0] for row in result.get("values", []) if row and row[0].strip()]
         return wells
 
-async def get_well_description(sheet_id, well_number):
+async def get_well_description(sheet_id, well_number, mode):
     creds = await get_creds_from_object_storage()
+    sheet_name = SHEET_NAMES[mode]  # Используем соответствующее название вкладки
     async with Aiogoogle(service_account_creds=creds) as aiogoogle:
         sheets_api = await aiogoogle.discover("sheets", "v4")
         result = await aiogoogle.as_service_account(
             sheets_api.spreadsheets.values.get(
                 spreadsheetId=sheet_id,
-                range=f"{SHEET_NAME}!A2:B"
+                range=f"{sheet_name}!A2:B"
             )
         )
         for row in result.get("values", []):
@@ -117,7 +122,16 @@ def make_keyboard(buttons, row_width=3):
     return {"inline_keyboard": keyboard}
 
 def handler(event, context):
-    data = json.loads(event['body'])
+    # Проверка наличия body и его обработка
+    if 'body' not in event or not event['body']:
+        return {"statusCode": 200, "body": json.dumps({"ok": True, "message": "No body provided"})}
+    
+    try:
+        data = json.loads(event['body'])
+    except json.JSONDecodeError:
+        # Возможно, это тестовый вызов или прямой GET-запрос
+        return {"statusCode": 200, "body": json.dumps({"ok": True, "message": "Invalid JSON in body"})}
+    
     loop = asyncio.get_event_loop()
 
     if "message" in data:
@@ -146,7 +160,7 @@ def handler(event, context):
         # Если выбрали режим
         if data_str in ("drilling", "completion"):
             set_user_state(user_id, data_str)
-            wells = loop.run_until_complete(get_well_list(SHEET_IDS[data_str]))
+            wells = loop.run_until_complete(get_well_list(SHEET_IDS[data_str], data_str))
             keyboard = make_keyboard(wells, row_width=3)
             loop.run_until_complete(send_message(chat_id, "Выберите скважину:", keyboard))
             return {"statusCode": 200, "body": json.dumps({"ok": True})}
@@ -154,7 +168,7 @@ def handler(event, context):
         # Если выбрали скважину
         mode = get_user_state(user_id)
         if mode and data_str:
-            description = loop.run_until_complete(get_well_description(SHEET_IDS[mode], data_str))
+            description = loop.run_until_complete(get_well_description(SHEET_IDS[mode], data_str, mode))
             loop.run_until_complete(send_message(chat_id, f"<b>{data_str}</b>\n{description}"))
             return {"statusCode": 200, "body": json.dumps({"ok": True})}
 
