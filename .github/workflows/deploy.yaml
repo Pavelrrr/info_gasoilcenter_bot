@@ -13,25 +13,36 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Записываем содержимое key.json из секрета в файл
-      - name: Write key.json from secret
+      # Декодируем YDB ключ из base64
+      - name: Decode YDB key.json from base64
         run: |
-          echo "${{ secrets.KEY_JSON }}" | base64 -d > key.json
+          echo "${{ secrets.KEY_JSON_BASE64 }}" | base64 --decode > key.json
 
-      # (Опционально) Убедитесь, что requirements.txt и main.py есть в репозитории
+      # Декодируем Google Cloud ключ из base64
+      - name: Decode Google credentials from base64
+        run: |
+          echo "${{ secrets.GOOGLE_CLOUD_REGIONAL_JSON }}" | base64 --decode > google_creds.json
 
       # Деплой функции с помощью yc-actions/yc-sls-function
       - name: Deploy Function
         uses: yc-actions/yc-sls-function@v3
         with:
-          yc-sa-json-credentials: ${{ secrets.YC_FUNCTIONS_JSON_CRED}}
+          yc-sa-json-credentials: ${{ secrets.YC_FUNCTIONS_JSON_CRED }}
           folder-id: ${{ secrets.FOLDER_ID }}
           function-name: ${{ secrets.FUNCTION_NAME }}
           runtime: 'python311'
           memory: '256Mb'
           entrypoint: 'main.handler'
-          environment: TELEGRAM_TOKEN=${{ secrets.INFO_GASOILCENTER_BOT_TOKEN }},DRILLING_SHEET_ID=${{ secrets.DRILLING_SHEET_ID }},COMPLETION_SHEET_ID=${{ secrets.COMPLETION_SHEET_ID }},CREDS_URL=${{ secrets.GOOGLE_CLOUD_REGIONAL_JSON }},YDB_ENDPOINT=${{ secrets.YDB_ENDPOINT }},YDB_DATABASE=${{ secrets.YDB_DATABASE }},YDB_SERVICE_ACCOUNT_KEY_FILE_CREDENTIALS=key.json
+          environment: >-
+            TELEGRAM_TOKEN=${{ secrets.INFO_GASOILCENTER_BOT_TOKEN }}
+            DRILLING_SHEET_ID=${{ secrets.DRILLING_SHEET_ID }}
+            COMPLETION_SHEET_ID=${{ secrets.COMPLETION_SHEET_ID }}
+            CREDS_URL=google_creds.json
+            YDB_ENDPOINT=${{ secrets.YDB_ENDPOINT }}
+            YDB_DATABASE=${{ secrets.YDB_DATABASE }}
+            YDB_SERVICE_ACCOUNT_KEY_FILE_CREDENTIALS=key.json
           include: |
             main.py
             requirements.txt
             key.json
+            google_creds.json
