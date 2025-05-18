@@ -22,7 +22,7 @@ jobs:
 
       # Деплой функции с помощью yc-actions/yc-sls-function
       - name: Deploy Function
-        uses: yc-actions/yc-sls-function@v3
+        uses: yc-actions/yc-sls-function@v3.2.0
         with:
           yc-sa-json-credentials: ${{ secrets.YC_FUNCTIONS_JSON_CRED}}
           folder-id: ${{ secrets.FOLDER_ID }}
