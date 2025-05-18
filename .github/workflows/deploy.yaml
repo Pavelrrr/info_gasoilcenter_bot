@@ -16,7 +16,7 @@ jobs:
       # Записываем содержимое key.json из секрета в файл
       - name: Write key.json from secret
         run: |
-          echo "${{ secrets.YDB_ADMIN }}" > key.json
+          echo "${{ secrets.KEY_JSON }}" | base64 -d > key.json
 
       # (Опционально) Убедитесь, что requirements.txt и main.py есть в репозитории
 
