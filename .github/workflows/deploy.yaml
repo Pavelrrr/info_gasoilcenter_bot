@@ -33,7 +33,14 @@ jobs:
           runtime: 'python311'
           memory: '256Mb'
           entrypoint: 'main.handler'
-          environment: TELEGRAM_TOKEN=${{ secrets.INFO_GASOILCENTER_BOT_TOKEN }},DRILLING_SHEET_ID=${{ secrets.DRILLING_SHEET_ID }},COMPLETION_SHEET_ID=${{ secrets.COMPLETION_SHEET_ID }},CREDS_URL=google_creds.json, YDB_ENDPOINT=${{ secrets.YDB_ENDPOINT }},YDB_DATABASE=${{ secrets.YDB_DATABASE }},YDB_SERVICE_ACCOUNT_KEY_FILE_CREDENTIALS=key.json
+          environment: >-
+            TELEGRAM_TOKEN=${{ secrets.INFO_GASOILCENTER_BOT_TOKEN }},
+            DRILLING_SHEET_ID=${{ secrets.DRILLING_SHEET_ID }},
+            COMPLETION_SHEET_ID=${{ secrets.COMPLETION_SHEET_ID }},
+            CREDS_URL=google_creds.json,
+            YDB_ENDPOINT=${{ secrets.YDB_ENDPOINT }},
+            YDB_DATABASE=${{ secrets.YDB_DATABASE }},
+            YDB_SERVICE_ACCOUNT_KEY_FILE_CREDENTIALS=key.json
           include: |
             main.py
             requirements.txt
