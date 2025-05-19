@@ -13,16 +13,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Декодируем YDB ключ из base64
-      - name: Decode YDB key.json from base64
-        run: |
-          echo "${{ secrets.KEY_JSON_BASE64 }}" | base64 --decode > key.json
-
-      # Декодируем Google Cloud ключ из base64
-      - name: Decode Google credentials from base64
-        run: |
-          echo "${{ secrets.GOOGLE_CLOUD_REGIONAL_JSON }}" | base64 --decode > google_creds.json
-
       # Деплой функции с помощью yc-actions/yc-sls-function
       - name: Deploy Function
         uses: yc-actions/yc-sls-function@v3
@@ -37,12 +27,13 @@ jobs:
             TELEGRAM_TOKEN=${{ secrets.INFO_GASOILCENTER_BOT_TOKEN }},
             DRILLING_SHEET_ID=${{ secrets.DRILLING_SHEET_ID }},
             COMPLETION_SHEET_ID=${{ secrets.COMPLETION_SHEET_ID }},
-            CREDS_URL=google_creds.json,
+            CREDS_URL=${{ secrets.GOOGLE_CLOUD_REGIONAL_JSON }},
+            YDB_KEY_URL=${{ secrets.KEY_JSON }},
             YDB_ENDPOINT=${{ secrets.YDB_ENDPOINT }},
-            YDB_DATABASE=${{ secrets.YDB_DATABASE }},
-            YDB_SERVICE_ACCOUNT_KEY_FILE_CREDENTIALS=key.json
+            YDB_DATABASE=${{ secrets.YDB_DATABASE }}
           include: |
             main.py
+            bot.py
+            services.py
+            utils.py
             requirements.txt
-            key.json
-            google_creds.json
