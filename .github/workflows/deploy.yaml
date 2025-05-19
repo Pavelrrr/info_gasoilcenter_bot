@@ -24,13 +24,7 @@ jobs:
           memory: '256Mb'
           entrypoint: 'main.handler'
           environment: >-
-            TELEGRAM_TOKEN=${{ secrets.INFO_GASOILCENTER_BOT_TOKEN }},
-            DRILLING_SHEET_ID=${{ secrets.DRILLING_SHEET_ID }},
-            COMPLETION_SHEET_ID=${{ secrets.COMPLETION_SHEET_ID }},
-            CREDS_URL=${{ secrets.GOOGLE_CLOUD_REGIONAL_JSON }},
-            YDB_KEY_URL=${{ secrets.KEY_JSON }},
-            YDB_ENDPOINT=${{ secrets.YDB_ENDPOINT }},
-            YDB_DATABASE=${{ secrets.YDB_DATABASE }}
+            TELEGRAM_TOKEN=${{secrets.INFO_GASOILCENTER_BOT_TOKEN}},DRILLING_SHEET_ID=${{secrets.DRILLING_SHEET_ID }},COMPLETION_SHEET_ID=${{secrets.COMPLETION_SHEET_ID}},CREDS_URL=${{secrets.GOOGLE_CLOUD_REGIONAL_JSON }},YDB_KEY_URL=${{secrets.KEY_JSON }},YDB_ENDPOINT=${{secrets.YDB_ENDPOINT }},YDB_DATABASE=${{secrets.YDB_DATABASE }}
           include: |
             main.py
             bot.py
