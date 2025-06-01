@@ -5,8 +5,13 @@ from aiogram.enums import ParseMode
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from services.ydb_storage import set_user_state, get_user_state
-from services.google_sheets import get_well_list, get_well_description
+from services import set_user_state, get_user_state
+from services import get_well_list, get_well_description
+from aiogram.client.default import DefaultBotProperties
+from dotenv import load_dotenv
+
+
+load_dotenv() 
 
 # Конфигурация
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -19,8 +24,10 @@ SHEET_IDS = {
 }
 
 def setup_bot():
-    """Создает и настраивает экземпляр бота"""
-    return Bot(token=TELEGRAM_TOKEN, parse_mode=ParseMode.HTML)
+    return Bot(
+        token=TELEGRAM_TOKEN,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+    )
 
 def setup_dispatcher():
     """Создает и настраивает диспетчер"""

@@ -6,9 +6,9 @@ import ydb
 from aiogoogle import Aiogoogle
 from aiogoogle.auth.creds import ServiceAccountCreds
 from utils import download_file
-
+from dotenv import load_dotenv
 logger = logging.getLogger(__name__)
-
+load_dotenv() 
 # Конфигурация Google Sheets
 CREDS_URL = os.environ.get("CREDS_URL")
 SHEET_NAMES = {

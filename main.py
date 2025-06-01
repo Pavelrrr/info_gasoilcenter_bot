@@ -1,9 +1,12 @@
+from dotenv import load_dotenv
 import os
 import json
 import asyncio
 import logging
 from bot import setup_bot, setup_dispatcher
-from services.ydb_storage import cleanup_temp_files
+from services import cleanup_temp_files
+load_dotenv()
+
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -51,8 +54,15 @@ def handler(event, context):
         cleanup_temp_files()
 
 # Запуск бота в режиме поллинга (для локальной разработки)
+# Для локального тестирования
 if __name__ == "__main__":
-    async def on_startup():
-        logger.info("Bot started")
+    async def main_local():
+        logger.info("Starting bot in polling mode...")
+        try:
+            await dp.start_polling(bot)
+        except Exception as e:
+            logger.error(f"Error in polling: {str(e)}")
+        finally:
+            cleanup_temp_files()
     
-    asyncio.run(dp.start_polling(bot, on_startup=on_startup))
+    asyncio.run(main_local())
