@@ -10,7 +10,6 @@ from services import get_well_list, get_well_description
 from aiogram.client.default import DefaultBotProperties
 from dotenv import load_dotenv
 
-
 load_dotenv() 
 
 # Конфигурация
@@ -65,8 +64,15 @@ async def process_mode_selection(callback: CallbackQuery):
         mode = callback.data
         logger.info(f"User {user_id} selected mode: {mode}")
         
+        # Проверим, что mode не None и не пустая строка
+        if not mode:
+            logger.error(f"Mode is empty or None: {mode}")
+            await callback.message.answer("⚠️ Ошибка: не выбран режим")
+            await callback.answer()
+            return
+        
         # Сохраняем выбранный режим
-        set_user_state(user_id, mode)
+        await set_user_state(user_id, mode)
         
         # Получаем список скважин
         wells = await get_well_list(SHEET_IDS[mode], mode)
@@ -82,14 +88,15 @@ async def process_mode_selection(callback: CallbackQuery):
         await callback.message.answer("⚠️ Ошибка при загрузке данных")
         await callback.answer()
 
+
 async def process_well_selection(callback: CallbackQuery):
     """Обработчик выбора скважины"""
     try:
         user_id = callback.from_user.id
         well_number = callback.data
         
-        # Получаем режим пользователя
-        mode = get_user_state(user_id)
+        # Получаем режим пользователя (добавлен await)
+        mode = await get_user_state(user_id)
         
         if mode:
             logger.info(f"Processing well selection {well_number} in mode {mode}")

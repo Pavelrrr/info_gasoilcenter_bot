@@ -3,15 +3,27 @@ import os
 import json
 import asyncio
 import logging
+from aiogram.types import Update
 from bot import setup_bot, setup_dispatcher
 from services import cleanup_temp_files
-load_dotenv()
 
+load_dotenv()
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+async def main_local():
+    logger.info("Starting bot in polling mode...")
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+        await init_user_state_table()  # Добавьте эту строку
+        await dp.start_polling(bot)
+    except Exception as e:
+        logger.error(f"Error in polling: {str(e)}")
+    finally:
+        cleanup_temp_files()
+        
 # Инициализация бота и диспетчера
 bot = setup_bot()
 dp = setup_dispatcher()
@@ -20,7 +32,9 @@ dp = setup_dispatcher()
 async def process_webhook_update(update_json):
     """Обрабатывает webhook-запрос от Telegram"""
     try:
-        await dp.feed_update(bot=bot, update=update_json)
+        # Создаем объект Update из JSON
+        update = Update(**update_json)
+        await dp.feed_update(bot=bot, update=update)
         return {"statusCode": 200, "body": json.dumps({"ok": True})}
     except Exception as e:
         logger.error(f"Error processing update: {str(e)}", exc_info=True)
@@ -45,7 +59,13 @@ def handler(event, context):
             return {"statusCode": 200, "body": json.dumps({"ok": True, "message": "Invalid JSON in body"})}
         
         # Обрабатываем обновление
-        return asyncio.run(process_webhook_update(update_json))
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(process_webhook_update(update_json))
+        finally:
+            loop.close()
+            
     except Exception as e:
         logger.error(f"Global error: {str(e)}", exc_info=True)
         return {"statusCode": 500, "body": json.dumps({"ok": False, "error": str(e)})}
@@ -54,11 +74,12 @@ def handler(event, context):
         cleanup_temp_files()
 
 # Запуск бота в режиме поллинга (для локальной разработки)
-# Для локального тестирования
 if __name__ == "__main__":
     async def main_local():
         logger.info("Starting bot in polling mode...")
         try:
+            # Удаляем webhook перед запуском polling
+            await bot.delete_webhook(drop_pending_updates=True)
             await dp.start_polling(bot)
         except Exception as e:
             logger.error(f"Error in polling: {str(e)}")
