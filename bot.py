@@ -8,9 +8,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from services import set_user_state, get_user_state
 from services import get_well_list, get_well_description
 from aiogram.client.default import DefaultBotProperties
-from dotenv import load_dotenv
 
-load_dotenv() 
 
 # Конфигурация
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
