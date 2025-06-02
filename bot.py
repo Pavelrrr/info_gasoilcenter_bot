@@ -9,6 +9,26 @@ from services import set_user_state, get_user_state
 from services import get_well_list, get_well_description
 from aiogram.client.default import DefaultBotProperties
 
+MAX_MESSAGE_LENGTH = 4096
+
+def split_message(text, max_length=MAX_MESSAGE_LENGTH):
+    # Разбивает текст на части по границе строки или пробела, чтобы не резать слова
+    parts = []
+    while text:
+        if len(text) <= max_length:
+            parts.append(text)
+            break
+        part = text[:max_length]
+        last_n = part.rfind('\n')
+        last_sp = part.rfind(' ')
+        split_at = max(last_n, last_sp)
+        if split_at == -1:
+            split_at = max_length
+        parts.append(text[:split_at])
+        text = text[split_at:].lstrip()
+    return parts
+
+
 
 # Конфигурация
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -126,7 +146,7 @@ async def process_well_selection(callback: CallbackQuery):
     try:
         user_id = callback.from_user.id
         well_number = callback.data
-        
+
         # Проверяем специальные команды навигации
         if well_number == "back_to_modes":
             await callback.message.edit_text(
@@ -135,7 +155,7 @@ async def process_well_selection(callback: CallbackQuery):
             )
             await callback.answer()
             return
-        
+
         if well_number == "back_to_start":
             builder = InlineKeyboardBuilder()
             builder.button(text="🚀 Начать", callback_data="start_bot")
@@ -146,16 +166,16 @@ async def process_well_selection(callback: CallbackQuery):
             )
             await callback.answer()
             return
-        
+
         # Получаем режим пользователя
         mode = await get_user_state(user_id)
-        
+
         if mode:
             logger.info(f"Processing well selection {well_number} in mode {mode}")
-            
+
             # Получаем описание скважины
             description = await get_well_description(SHEET_IDS[mode], well_number, mode)
-            
+
             # Создаем клавиатуру с кнопками возврата
             builder = InlineKeyboardBuilder()
             builder.row(
@@ -165,21 +185,27 @@ async def process_well_selection(callback: CallbackQuery):
             builder.row(
                 InlineKeyboardButton(text="🏠 В начало", callback_data="back_to_start")
             )
-            
-            # Отправляем сообщение с описанием и кнопками
-            await callback.message.edit_text(
-                f"<b>🔹 Скважина {well_number}</b>\n\n"
-                f"📋 <b>Описание работ:</b>\n{description}",
-                reply_markup=builder.as_markup()
-            )
+
+            full_text = f"🔹 Скважина {well_number}\n\n📋 Описание работ:\n{description}"
+            parts = split_message(full_text)
+
+            # Удаляем старое сообщение
+            await callback.message.delete()
+
+            # Отправляем все части, кроме последней, без клавиатуры
+            for part in parts[:-1]:
+                await callback.message.answer(part)
+
+            # Последнюю часть отправляем с клавиатурой
+            await callback.message.answer(parts[-1], reply_markup=builder.as_markup())
+
             await callback.answer()
         else:
-            logger.warning(f"User {user_id} has no mode selected")
-            await callback.message.edit_text("⚠️ Сначала выберите режим")
-            await callback.answer()
+            await callback.answer("Режим не выбран.")
     except Exception as e:
         logger.error(f"Error processing well selection: {str(e)}")
         await callback.answer("⚠️ Ошибка при получении описания")
+
 
 def get_mode_keyboard():
     """Создает клавиатуру выбора режима"""
@@ -256,3 +282,23 @@ async def process_back_to_wells(callback: CallbackQuery):
     except Exception as e:
         logger.error(f"Error returning to wells list: {str(e)}")
         await callback.answer("⚠️ Произошла ошибка")
+
+def split_message(text, max_length=4000):
+    """Разбивает длинное сообщение на части"""
+    if len(text) <= max_length:
+        return [text]
+    
+    messages = []
+    while len(text) > max_length:
+        # Ищем последний пробел в пределах лимита
+        split_pos = text.rfind(' ', 0, max_length)
+        if split_pos == -1:  # Если нет пробелов, режем по лимиту
+            split_pos = max_length
+        
+        messages.append(text[:split_pos])
+        text = text[split_pos:].lstrip()
+    
+    if text:  # Добавляем остаток
+        messages.append(text)
+    
+    return messages
