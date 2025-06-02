@@ -1,3 +1,4 @@
 httpx
 aiogoogle
 ydb
+aiogram>=3.0.
