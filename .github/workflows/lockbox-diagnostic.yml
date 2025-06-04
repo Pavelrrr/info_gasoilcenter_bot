@@ -1,0 +1,34 @@
+name: Lockbox Diagnostic
+
+permissions:
+  id-token: write # Требуется для запроса JWT-токена
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install OIDC Client from Core Package
+      run: npm install @actions/core @actions/http-client
+    - name: Get Id Token
+      uses: actions/github-script@v7
+      id: tokenid
+      with:
+        script: |
+          const coredemo = require('@actions/core')
+          let id_token = await coredemo.getIDToken()
+          coredemo.setOutput('id_token', id_token)
+    - name: GetIAMToken
+      run: |
+        SA_ID="${{ secrets.YC_SA_ID }}"
+        IAMTOKEN=$(curl -sH "Content-Type: application/x-www-form-urlencoded" -d "grant_type=urn:ietf:params:oauth:grant-type:token-exchange&requested_token_type=urn:ietf:params:oauth:token-type:access_token&audience=$SA_ID&subject_token=${{steps.tokenid.outputs.id_token}}&subject_token_type=urn:ietf:params:oauth:token-type:id_token" -X POST https://auth.yandex.cloud/oauth/token | jq -r '.access_token')
+        echo "IAMToken=${IAMTOKEN}" >> $GITHUB_OUTPUT
+      id: IAMtoken
+    - name: GetLockboxPayload
+      run: |
+        SECRET_ID="${{ secrets.LOCKBOX_SECRET_ID }}"
+        SECRET_DATA=$(curl -sH "Authorization: Bearer ${{steps.IAMtoken.outputs.IAMToken}}" https://payload.lockbox.api.cloud.yandex.net/lockbox/v1/secrets/$SECRET_ID/payload)
+        echo "SECRET_DATA=${SECRET_DATA}" >> $GITHUB_OUTPUT
+      id: getlockboxpayload
