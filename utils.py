@@ -5,6 +5,9 @@ logger = logging.getLogger(__name__)
 
 async def download_file(url, is_json=False):
     """Загружает файл по URL"""
+    if not url:
+        logger.error("URL для скачивания не задан!")
+        raise ValueError("URL для скачивания не задан!")
     try:
         logger.info(f"Downloading file from {url}")
         async with httpx.AsyncClient() as client:

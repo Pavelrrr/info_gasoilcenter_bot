@@ -1,5 +1,6 @@
 import os
 import logging
+from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
@@ -10,7 +11,7 @@ from services import get_well_list, get_well_description
 from aiogram.client.default import DefaultBotProperties
 
 MAX_MESSAGE_LENGTH = 4096
-
+load_dotenv()
 def split_message(text, max_length=MAX_MESSAGE_LENGTH):
     # Разбивает текст на части по границе строки или пробела, чтобы не резать слова
     parts = []

@@ -3,9 +3,11 @@ import logging
 import asyncio
 import tempfile
 import ydb
+from dotenv import load_dotenv
 from aiogoogle import Aiogoogle
 from aiogoogle.auth.creds import ServiceAccountCreds
 from utils import download_file
+load_dotenv()
 
 
 logger = logging.getLogger(__name__)
