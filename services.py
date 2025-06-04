@@ -23,7 +23,7 @@ SHEET_NAMES = {
 # Конфигурация YDB
 YDB_ENDPOINT = os.environ.get("YDB_ENDPOINT")
 YDB_DATABASE = os.environ.get("YDB_DATABASE")
-YDB_KEY_URL = os.environ.get("YDB_KEY_URL")
+YDB_KEY_SA = os.environ.get("YDB_KEY_SA")
 
 # Глобальные переменные
 _creds_dict = None
@@ -105,20 +105,14 @@ async def get_ydb_key_path():
     """Загружает YDB ключ и сохраняет во временный файл"""
     global _ydb_key_path
     if _ydb_key_path is None:
-        try:
             logger.info("Downloading YDB key")
-            key_content = await download_file(YDB_KEY_URL)
-            
-            # Создаем временный файл для ключа
+            key_content = os.environ.get(YDB_KEY_SA)
+            if not key_content:
+                raise ValueError("YDB_SA_KEY_JSON is not set in environment variables")
             temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
             temp_file.write(key_content)
             temp_file.close()
             _ydb_key_path = temp_file.name
-            
-            logger.info(f"YDB key saved to temporary file: {_ydb_key_path}")
-        except Exception as e:
-            logger.error(f"Error getting YDB key: {str(e)}")
-            raise
     return _ydb_key_path
 
 async def get_ydb_pool():
