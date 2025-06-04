@@ -47,7 +47,7 @@ jobs:
           DRILLING_SHEET_ID=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="DRILLING_SHEET_ID") | .textValue')
           YDB_ENDPOINT=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="YDB_ENDPOINT") | .textValue')
           YDB_DATABASE=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="YDB_DATABASE") | .textValue')
-          YDB_KEY_SA =$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="YDB_KEY_SA") | .textValue')
+          YDB_KEY_SA=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="YDB_KEY_SA") | .textValue')
           echo "TELEGRAM_TOKEN=${TELEGRAM_TOKEN}" >> $GITHUB_OUTPUT
           echo "DRILLING_SHEET_ID=${DRILLING_SHEET_ID}" >> $GITHUB_OUTPUT
           echo "YDB_ENDPOINT=${YDB_ENDPOINT}" >> $GITHUB_OUTPUT
