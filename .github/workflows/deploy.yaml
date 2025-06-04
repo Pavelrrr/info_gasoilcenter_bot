@@ -1,33 +1,79 @@
-name: Deploy to Yandex Cloud Functions
+name: Deploy to Yandex Cloud with Federation and Lockbox
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
+
+permissions:
+  id-token: write  # Нужно для получения OIDC токена от GitHub
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Деплой функции с помощью yc-actions/yc-sls-functo
-      - name: Deploy Function
+      # Получаем OIDC токен от GitHub
+      - name: Get OIDC token
+        id: oidc
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const core = require('@actions/core');
+            let id_token = await core.getIDToken();
+            core.setOutput('id_token', id_token);
+
+      # Меняем OIDC токен на IAM токен Yandex Cloud через федерацию
+      - name: Exchange OIDC for Yandex Cloud IAM token
+        id: get-iam-token
+        run: |
+          SA_ID="${{ secrets.YC_SA_ID }}"  # ID сервисного аккаунта с нужными ролями
+          ID_TOKEN="${{ steps.oidc.outputs.id_token }}"
+          IAMTOKEN=$(curl -sH "Content-Type: application/x-www-form-urlencoded" \
+            -d "grant_type=urn:ietf:params:oauth:grant-type:token-exchange&requested_token_type=urn:ietf:params:oauth:token-type:access_token&audience=$SA_ID&subject_token=$ID_TOKEN&subject_token_type=urn:ietf:params:oauth:token-type:id_token" \
+            -X POST https://auth.yandex.cloud/oauth/token | jq -r '.access_token')
+          echo "IAMTOKEN=${IAMTOKEN}" >> $GITHUB_OUTPUT
+
+      # Получаем секреты из Lockbox с помощью IAM токена
+      - name: Get Lockbox secrets
+        id: getlockbox
+        run: |
+          SECRET_ID="${{ secrets.LOCKBOX_SECRET_ID }}"
+          IAMTOKEN="${{ steps.get-iam-token.outputs.IAMTOKEN }}"
+          SECRET_DATA=$(curl -sH "Authorization: Bearer $IAMTOKEN" \
+            "https://payload.lockbox.api.cloud.yandex.net/lockbox/v1/secrets/$SECRET_ID/payload")
+          TELEGRAM_TOKEN=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="TELEGRAM_TOKEN") | .textValue')
+          DRILLING_SHEET_ID=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="DRILLING_SHEET_ID") | .textValue')
+          YDB_ENDPOINT=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="YDB_ENDPOINT") | .textValue')
+          YDB_DATABASE=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="YDB_DATABASE") | .textValue')
+          echo "TELEGRAM_TOKEN=${TELEGRAM_TOKEN}" >> $GITHUB_OUTPUT
+          echo "DRILLING_SHEET_ID=${DRILLING_SHEET_ID}" >> $GITHUB_OUTPUT
+          echo "YDB_ENDPOINT=${YDB_ENDPOINT}" >> $GITHUB_OUTPUT
+          echo "YDB_DATABASE=${YDB_DATABASE}" >> $GITHUB_OUTPUT
+
+      # Деплой serverless-функции с секретами из Lockbox
+      - name: Deploy Function to Yandex Cloud
         uses: yc-actions/yc-sls-function@v3
         with:
-          yc-sa-json-credentials: ${{ secrets.YC_FUNCTIONS_JSON_CRED }}
+          yc-iam-token: ${{ steps.get-iam-token.outputs.IAMTOKEN }}
+          bucket: ${{ secrets.BUCKET }}
           folder-id: ${{ secrets.FOLDER_ID }}
           function-name: ${{ secrets.FUNCTION_NAME }}
-          runtime: 'python311'
-          memory: '256Mb'
-          entrypoint: 'main.handler'
-          environment: >-
-            TELEGRAM_TOKEN=${{secrets.INFO_GASOILCENTER_BOT_TOKEN}},DRILLING_SHEET_ID=${{secrets.DRILLING_SHEET_ID }},COMPLETION_SHEET_ID=${{secrets.COMPLETION_SHEET_ID}},CREDS_URL=${{secrets.GOOGLE_CLOUD_REGIONAL_JSON }},YDB_KEY_URL=${{secrets.KEY_JSON }},YDB_ENDPOINT=${{secrets.YDB_ENDPOINT }},YDB_DATABASE=${{secrets.YDB_DATABASE }}
+          runtime: python311
+          memory: 512Mb
+          entrypoint: main.handler
+          environment: |
+            TELEGRAM_TOKEN=${{ steps.getlockbox.outputs.TELEGRAM_TOKEN }}
+            DRILLING_SHEET_ID=${{ steps.getlockbox.outputs.DRILLING_SHEET_ID }}
+            YDB_ENDPOINT=${{ steps.getlockbox.outputs.YDB_ENDPOINT }}
+            YDB_DATABASE=${{ steps.getlockbox.outputs.YDB_DATABASE }}
           include: |
-            main.py
-            bot.py
-            services.py
-            utils.py
+            .
             requirements.txt
+            main.py
+            services.py
+          exclude: |
+            .git*
+            tests/
