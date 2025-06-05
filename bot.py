@@ -7,7 +7,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKe
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from services import set_user_state, get_user_state
-from services import get_well_list_ydb, get_well_description_ydb
+from services import get_well_list_ydb, get_well_description_ydb, get_ydb_pool
 from aiogram.client.default import DefaultBotProperties
 
 MAX_MESSAGE_LENGTH = 4096
@@ -301,6 +301,7 @@ def split_message(text, max_length=4000):
 async def set_user_message_id(user_id: int, message_id: int):
     # Пример для YDB или любой другой БД
     # Здесь UPSERT: если запись есть — обновляет, если нет — создает
+    pool = await get_ydb_pool()
     query = """
     UPSERT INTO user_states (user_id, message_id)
     VALUES ($user_id, $message_id)
@@ -316,6 +317,7 @@ async def set_user_message_id(user_id: int, message_id: int):
     )
 
 async def get_user_message_id(user_id: int):
+    pool = await get_ydb_pool()
     query = """
     SELECT message_id FROM user_states WHERE user_id = $user_id
     """
