@@ -52,7 +52,9 @@ jobs:
           echo "DRILLING_SHEET_ID=${DRILLING_SHEET_ID}" >> $GITHUB_OUTPUT
           echo "YDB_ENDPOINT=${YDB_ENDPOINT}" >> $GITHUB_OUTPUT
           echo "YDB_DATABASE=${YDB_DATABASE}" >> $GITHUB_OUTPUT
+          echo 'YDB_KEY_SA<<EOF' >> $GITHUB_ENV
           echo "${YDB_KEY_SA}" >> $GITHUB_ENV
+          echo 'EOF' >> $GITHUB_ENV
 
       # Деплой serverless-функции с секретами из Lockbox
       - name: Deploy Function to Yandex Cloud
@@ -70,7 +72,7 @@ jobs:
             DRILLING_SHEET_ID=${{ steps.getlockbox.outputs.DRILLING_SHEET_ID }}
             YDB_ENDPOINT=${{ steps.getlockbox.outputs.YDB_ENDPOINT }}
             YDB_DATABASE=${{ steps.getlockbox.outputs.YDB_DATABASE }}
-            YDB_KEY_SA=${{ steps.getlockbox.outputs.YDB_KEY_SA }}
+            YDB_KEY_SA=${{ env.YDB_KEY_SA }} 
           include: |
             .
             requirements.txt
