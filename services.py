@@ -8,18 +8,19 @@ from dotenv import load_dotenv
 from aiogoogle import Aiogoogle
 from aiogoogle.auth.creds import ServiceAccountCreds
 from utils import download_file
+from datetime import date
 load_dotenv()
 
 
 logger = logging.getLogger(__name__)
 
 
-# Конфигурация Google Sheets
-CREDS_URL = os.environ.get("CREDS_URL")
-SHEET_NAMES = {
-    "drilling": "08:00",
-    "completion": "08:00 ОСВ"
-}
+# # Конфигурация Google Sheets
+# CREDS_URL = os.environ.get("CREDS_URL")
+# SHEET_NAMES = {
+#     "drilling": "08:00",
+#     "completion": "08:00 ОСВ"
+# }
 
 # Конфигурация YDB
 YDB_ENDPOINT = os.environ.get("YDB_ENDPOINT")
@@ -31,76 +32,6 @@ _creds_dict = None
 _ydb_key_path = None
 ydb_driver = None
 ydb_pool = None
-
-# --- Google Sheets функции ---
-
-async def get_creds_from_object_storage():
-    """Загружает Google учетные данные из Object Storage"""
-    global _creds_dict
-    if _creds_dict is None:
-        try:
-            logger.info(f"Downloading Google credentials from {CREDS_URL}")
-            _creds_dict = await download_file(CREDS_URL, is_json=True)
-            logger.info("Google credentials downloaded successfully")
-        except Exception as e:
-            logger.error(f"Error downloading Google credentials: {str(e)}")
-            raise
-    
-    creds = ServiceAccountCreds(
-        scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
-        **_creds_dict
-    )
-    return creds
-
-async def get_well_list(sheet_id, mode):
-    """Получает список скважин из Google Sheets"""
-    try:
-        logger.info(f"Getting well list for {mode} from sheet {sheet_id}")
-        creds = await get_creds_from_object_storage()
-        sheet_name = SHEET_NAMES[mode]
-        
-        async with Aiogoogle(service_account_creds=creds) as aiogoogle:
-            sheets_api = await aiogoogle.discover("sheets", "v4")
-            result = await aiogoogle.as_service_account(
-                sheets_api.spreadsheets.values.get(
-                    spreadsheetId=sheet_id,
-                    range=f"{sheet_name}!A2:A"
-                )
-            )
-            wells = [row[0] for row in result.get("values", []) if row and row[0].strip()]
-            logger.info(f"Found {len(wells)} wells")
-            return wells
-    except Exception as e:
-        logger.error(f"Error getting well list: {str(e)}")
-        raise
-
-async def get_well_description(sheet_id, well_number, mode):
-    """Получает описание скважины из Google Sheets"""
-    try:
-        logger.info(f"Getting description for well {well_number} in mode {mode}")
-        creds = await get_creds_from_object_storage()
-        sheet_name = SHEET_NAMES[mode]
-        
-        async with Aiogoogle(service_account_creds=creds) as aiogoogle:
-            sheets_api = await aiogoogle.discover("sheets", "v4")
-            result = await aiogoogle.as_service_account(
-                sheets_api.spreadsheets.values.get(
-                    spreadsheetId=sheet_id,
-                    range=f"{sheet_name}!A2:B"
-                )
-            )
-            for row in result.get("values", []):
-                if row[0].strip() == well_number.strip():
-                    desc = row[1] if len(row) > 1 else "Описание работ не найдено"
-                    logger.info(f"Found description for well {well_number}")
-                    return desc
-            logger.info(f"Well {well_number} not found")
-            return "Скважина не найдена"
-    except Exception as e:
-        logger.error(f"Error getting well description: {str(e)}")
-        return "Ошибка при получении данных"
-
-# --- YDB функции ---
 
 async def get_ydb_key_path():
     """
@@ -335,3 +266,118 @@ async def init_user_state_table():
             logger.error(f"Error creating user_state table: {str(e)}")
             raise
 
+async def get_well_list_ydb(mode):
+    """
+    Получает список скважин из таблицы wells в YDB только за текущие сутки.
+    """
+    pool = await get_ydb_pool()
+    today_str = date.today().strftime('%Y-%m-%d')
+
+    def tx(session):
+        query = f"""
+        SELECT well_number FROM wells WHERE date = DATE('{today_str}')
+        """
+        result = session.transaction().execute(query, commit_tx=True)
+        return [row.well_number for row in result[0].rows]
+
+    loop = asyncio.get_event_loop()
+    wells = await loop.run_in_executor(None, pool.retry_operation_sync, tx)
+    return wells
+
+
+async def get_well_description_ydb(well_number):
+    """
+    Получает описание скважины из YDB только за текущие сутки.
+    """
+    pool = await get_ydb_pool()
+    today_str = date.today().strftime('%Y-%m-%d')
+
+    def tx(session):
+        # Экранируем кавычки в номере скважины на всякий случай
+        safe_well_number = str(well_number).replace("'", "''")
+        query = f"""
+        SELECT description FROM wells
+        WHERE well_number = '{safe_well_number}' AND date = DATE('{today_str}')
+        """
+        result = session.transaction().execute(query, commit_tx=True)
+        rows = result[0].rows
+        return rows[0].description if rows else "Скважина не найдена"
+
+    loop = asyncio.get_event_loop()
+    description = await loop.run_in_executor(None, pool.retry_operation_sync, tx)
+    return description
+
+
+
+
+
+
+# --- Google Sheets функции ---
+
+# async def get_creds_from_object_storage():
+#     """Загружает Google учетные данные из Object Storage"""
+#     global _creds_dict
+#     if _creds_dict is None:
+#         try:
+#             logger.info(f"Downloading Google credentials from {CREDS_URL}")
+#             _creds_dict = await download_file(CREDS_URL, is_json=True)
+#             logger.info("Google credentials downloaded successfully")
+#         except Exception as e:
+#             logger.error(f"Error downloading Google credentials: {str(e)}")
+#             raise
+    
+#     creds = ServiceAccountCreds(
+#         scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
+#         **_creds_dict
+#     )
+#     return creds
+
+# async def get_well_list(sheet_id, mode):
+#     """Получает список скважин из Google Sheets"""
+#     try:
+#         logger.info(f"Getting well list for {mode} from sheet {sheet_id}")
+#         creds = await get_creds_from_object_storage()
+#         sheet_name = SHEET_NAMES[mode]
+        
+#         async with Aiogoogle(service_account_creds=creds) as aiogoogle:
+#             sheets_api = await aiogoogle.discover("sheets", "v4")
+#             result = await aiogoogle.as_service_account(
+#                 sheets_api.spreadsheets.values.get(
+#                     spreadsheetId=sheet_id,
+#                     range=f"{sheet_name}!A2:A"
+#                 )
+#             )
+#             wells = [row[0] for row in result.get("values", []) if row and row[0].strip()]
+#             logger.info(f"Found {len(wells)} wells")
+#             return wells
+#     except Exception as e:
+#         logger.error(f"Error getting well list: {str(e)}")
+#         raise
+
+# async def get_well_description(sheet_id, well_number, mode):
+#     """Получает описание скважины из Google Sheets"""
+#     try:
+#         logger.info(f"Getting description for well {well_number} in mode {mode}")
+#         creds = await get_creds_from_object_storage()
+#         sheet_name = SHEET_NAMES[mode]
+        
+#         async with Aiogoogle(service_account_creds=creds) as aiogoogle:
+#             sheets_api = await aiogoogle.discover("sheets", "v4")
+#             result = await aiogoogle.as_service_account(
+#                 sheets_api.spreadsheets.values.get(
+#                     spreadsheetId=sheet_id,
+#                     range=f"{sheet_name}!A2:B"
+#                 )
+#             )
+#             for row in result.get("values", []):
+#                 if row[0].strip() == well_number.strip():
+#                     desc = row[1] if len(row) > 1 else "Описание работ не найдено"
+#                     logger.info(f"Found description for well {well_number}")
+#                     return desc
+#             logger.info(f"Well {well_number} not found")
+#             return "Скважина не найдена"
+#     except Exception as e:
+#         logger.error(f"Error getting well description: {str(e)}")
+#         return "Ошибка при получении данных"
+
+# --- YDB функции ---

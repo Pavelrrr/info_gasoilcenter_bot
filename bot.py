@@ -7,7 +7,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKe
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from services import set_user_state, get_user_state
-from services import get_well_list, get_well_description
+from services import get_well_list_ydb, get_well_description_ydb
 from aiogram.client.default import DefaultBotProperties
 
 MAX_MESSAGE_LENGTH = 4096
@@ -35,11 +35,11 @@ def split_message(text, max_length=MAX_MESSAGE_LENGTH):
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 logger = logging.getLogger(__name__)
 
-# Получаем ID таблиц из переменных окружения
-SHEET_IDS = {
-    "drilling": os.environ.get("DRILLING_SHEET_ID"),
-    "completion": os.environ.get("COMPLETION_SHEET_ID")
-}
+# # Получаем ID таблиц из переменных окружения
+# SHEET_IDS = {
+#     "drilling": os.environ.get("DRILLING_SHEET_ID"),
+#     "completion": os.environ.get("COMPLETION_SHEET_ID")
+# }
 
 def setup_bot():
     return Bot(
@@ -123,7 +123,7 @@ async def process_mode_selection(callback: CallbackQuery):
         await set_user_state(user_id, mode)
         
         # Получаем список скважин
-        wells = await get_well_list(SHEET_IDS[mode], mode)
+        wells = await get_well_list_ydb(mode)
         
         # Определяем название режима для отображения
         mode_text = "Бурение" if mode == "drilling" else "Освоение"
@@ -175,7 +175,7 @@ async def process_well_selection(callback: CallbackQuery):
             logger.info(f"Processing well selection {well_number} in mode {mode}")
 
             # Получаем описание скважины
-            description = await get_well_description(SHEET_IDS[mode], well_number, mode)
+            description = await get_well_description_ydb(well_number)
 
             # Создаем клавиатуру с кнопками возврата
             builder = InlineKeyboardBuilder()
@@ -264,7 +264,7 @@ async def process_back_to_wells(callback: CallbackQuery):
         
         if mode:
             # Получаем список скважин заново
-            wells = await get_well_list(SHEET_IDS[mode], mode)
+            wells = await get_well_list_ydb(mode)
             
             # Показываем список скважин
             mode_text = "Бурение" if mode == "drilling" else "Освоение"
