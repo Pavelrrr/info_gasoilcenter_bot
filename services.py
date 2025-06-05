@@ -312,8 +312,8 @@ async def get_well_description_ydb(well_number):
     return formatted
 
 def format_description(text: str) -> str:
-    text = re.sub(r'(Работы за прошлые сутки[^\n\r:]*:)', r'🔷 <b>\1</b>', text)
-    text = re.sub(r'(Работы за текущие сутки[^\n\r:]*:)', r'🔵 <b>\1</b>', text)
+    text = re.sub(r'(Работы за прошлые сутки[^\n\r:]*:)', r' <b>\1</b>', text)
+    text = re.sub(r'(Работы за текущие сутки[^\n\r:]*:)', r' <b>\1</b>', text)
     text = re.sub(r'(Проблемные вопросы)', r'<b>\1</b>', text, flags=re.IGNORECASE)
     return text
 
