@@ -299,35 +299,40 @@ def split_message(text, max_length=4000):
     return messages
 
 async def set_user_message_id(user_id: int, message_id: int):
-    # Пример для YDB или любой другой БД
-    # Здесь UPSERT: если запись есть — обновляет, если нет — создает
     pool = await get_ydb_pool()
-    query = """
-    UPSERT INTO user_states (user_id, message_id)
-    VALUES ($user_id, $message_id)
-    """
-    params = {
-        "$user_id": user_id,
-        "$message_id": message_id
-    }
-    await pool.retry_operation_async(
-        lambda session: session.transaction().execute(
-            query, parameters=params, commit_tx=True
+    
+    async def tx(session):
+        query = """
+        UPSERT INTO user_states (user_id, message_id)
+        VALUES ($user_id, $message_id)
+        """
+        params = {
+            "$user_id": user_id,
+            "$message_id": message_id
+        }
+        session.transaction().execute(
+            query,
+            parameters=params,
+            commit_tx=True
         )
-    )
+    
+    await pool.retry_operation(tx)
 
-async def get_user_message_id(user_id: int):
+async def get_user_message_id(user_id: int) -> int | None:
     pool = await get_ydb_pool()
-    query = """
-    SELECT message_id FROM user_states WHERE user_id = $user_id
-    """
-    params = {"$user_id": user_id}
-    result = await pool.retry_operation_async(
-        lambda session: session.transaction().execute(
-            query, parameters=params, commit_tx=True
+    
+    async def tx(session):
+        query = """
+        SELECT message_id FROM user_states WHERE user_id = $user_id
+        """
+        params = {"$user_id": user_id}
+        result = session.transaction().execute(
+            query,
+            parameters=params,
+            commit_tx=True
         )
-    )
-    rows = result[0].rows
-    return rows[0].message_id if rows else None
+        return result[0].rows[0].message_id if result[0].rows else None
+    
+    return await pool.retry_operation(tx)
 
 
