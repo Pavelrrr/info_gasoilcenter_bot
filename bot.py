@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
@@ -300,8 +301,7 @@ def split_message(text, max_length=4000):
 
 async def set_user_message_id(user_id: int, message_id: int):
     pool = await get_ydb_pool()
-    
-    async def tx(session):
+    def tx(session):
         query = """
         UPSERT INTO user_states (user_id, message_id)
         VALUES ($user_id, $message_id)
@@ -315,13 +315,12 @@ async def set_user_message_id(user_id: int, message_id: int):
             parameters=params,
             commit_tx=True
         )
-    
-    await pool.retry_operation(tx)
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, pool.retry_operation_sync, tx)
 
-async def get_user_message_id(user_id: int) -> int | None:
+async def get_user_message_id(user_id: int):
     pool = await get_ydb_pool()
-    
-    async def tx(session):
+    def tx(session):
         query = """
         SELECT message_id FROM user_states WHERE user_id = $user_id
         """
@@ -332,7 +331,7 @@ async def get_user_message_id(user_id: int) -> int | None:
             commit_tx=True
         )
         return result[0].rows[0].message_id if result[0].rows else None
-    
-    return await pool.retry_operation(tx)
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, pool.retry_operation_sync, tx)
 
 
