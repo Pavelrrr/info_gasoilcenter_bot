@@ -3,6 +3,7 @@ import logging
 import asyncio
 import tempfile
 import ydb
+import httpx
 from dotenv import load_dotenv
 from aiogoogle import Aiogoogle
 from aiogoogle.auth.creds import ServiceAccountCreds
@@ -102,18 +103,36 @@ async def get_well_description(sheet_id, well_number, mode):
 # --- YDB функции ---
 
 async def get_ydb_key_path():
-    """Загружает YDB ключ и сохраняет во временный файл"""
+    """
+    Возвращает путь к сервисному ключу YDB:
+    - если есть переменная YDB_KEY_SA — сохраняет её содержимое во временный файл;
+    - если нет, но есть YDB_KEY_SA_URL — скачивает ключ по ссылке и сохраняет во временный файл.
+    """
     global _ydb_key_path
-    if _ydb_key_path is None:
-            logger.info("Downloading YDB key")
-            key_content = os.environ.get(YDB_KEY_SA)
-            if not key_content:
-                raise ValueError("YDB_SA_KEY_JSON is not set in environment variables")
-            temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
-            temp_file.write(key_content)
-            temp_file.close()
-            _ydb_key_path = temp_file.name
-    return _ydb_key_path
+    if _ydb_key_path is not None:
+        return _ydb_key_path
+
+    key_json = os.environ.get("YDB_KEY_SA")
+    if key_json:
+        temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
+        temp_file.write(key_json)
+        temp_file.close()
+        _ydb_key_path = temp_file.name
+        return _ydb_key_path
+
+    key_url = os.environ.get("YDB_KEY_SA_URL")
+    if key_url:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(key_url)
+            response.raise_for_status()
+            key_json = response.text
+        temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
+        temp_file.write(key_json)
+        temp_file.close()
+        _ydb_key_path = temp_file.name
+        return _ydb_key_path
+
+    raise ValueError("YDB_SA_KEY_JSON or YDB_KEY_URL must be set in environment variables")
 
 async def get_ydb_pool():
     """Инициализирует YDB драйвер и пул сессий"""
