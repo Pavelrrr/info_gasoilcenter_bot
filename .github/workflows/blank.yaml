@@ -47,12 +47,14 @@ jobs:
           DRILLING_SHEET_ID=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="DRILLING_SHEET_ID") | .textValue')
           YDB_ENDPOINT=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="YDB_ENDPOINT") | .textValue')
           YDB_DATABASE=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="YDB_DATABASE") | .textValue')
-          YDB_KEY_SA_B64=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="YDB_KEY_SA") | .fileValue')
+          YDB_KEY_SA_JSON=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="YDB_KEY_SA") | .textValue')
+          # Кодируем в base64 для безопасной передачи
+          YDB_KEY_SA_B64=$(echo "$YDB_KEY_SA_JSON" | base64 -w 0)
           echo "TELEGRAM_TOKEN=${TELEGRAM_TOKEN}" >> $GITHUB_OUTPUT
           echo "DRILLING_SHEET_ID=${DRILLING_SHEET_ID}" >> $GITHUB_OUTPUT
           echo "YDB_ENDPOINT=${YDB_ENDPOINT}" >> $GITHUB_OUTPUT
           echo "YDB_DATABASE=${YDB_DATABASE}" >> $GITHUB_OUTPUT
-          echo "$YDB_KEY_SA_B64" | base64 -d > ydb_key_sa.json
+          echo "YDB_KEY_SA_B64=$YDB_KEY_SA_B64" >> $GITHUB_ENV
 
       # Деплой serverless-функции с секретами из Lockbox
       - name: Deploy Function to Yandex Cloud
@@ -70,13 +72,12 @@ jobs:
             DRILLING_SHEET_ID=${{ steps.getlockbox.outputs.DRILLING_SHEET_ID }}
             YDB_ENDPOINT=${{ steps.getlockbox.outputs.YDB_ENDPOINT }}
             YDB_DATABASE=${{ steps.getlockbox.outputs.YDB_DATABASE }}
-            YDB_KEY_SA=ydb_key_sa.json
+            YDB_KEY_SA=${{ env.YDB_KEY_SA_B64 }}
           include: |
             .
             requirements.txt
             main.py
             services.py
-            ydb_key_sa.json
           exclude: |
             .git*
             tests/
