@@ -198,7 +198,7 @@ async def process_well_selection(callback: CallbackQuery):
                 await callback.message.answer(part, parse_mode="HTML")
 
             # Последнюю часть отправляем с клавиатурой
-            await callback.message.answer(parts[-1], reply_markup=builder.as_markup(), parse_mode="HTML")
+            await callback.message.answer(parts[-1], reply_markup=None, parse_mode="HTML")
 
             await callback.answer()
         else:
