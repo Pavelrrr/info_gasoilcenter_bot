@@ -303,8 +303,10 @@ async def set_user_message_id(user_id: int, message_id: int):
     pool = await get_ydb_pool()
     def tx(session):
         query = """
+        DECLARE $user_id AS Uint64;
+        DECLARE $message_id AS Uint64;
         UPSERT INTO user_states (user_id, message_id)
-        VALUES ($user_id, $message_id)
+        VALUES ($user_id, $message_id);
         """
         params = {
             "$user_id": user_id,
@@ -322,7 +324,8 @@ async def get_user_message_id(user_id: int):
     pool = await get_ydb_pool()
     def tx(session):
         query = """
-        SELECT message_id FROM user_states WHERE user_id = $user_id
+        DECLARE $user_id AS Uint64;
+        SELECT message_id FROM user_states WHERE user_id = $user_id;
         """
         params = {"$user_id": user_id}
         result = session.transaction().execute(
