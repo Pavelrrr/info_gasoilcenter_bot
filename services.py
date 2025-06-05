@@ -5,6 +5,7 @@ import tempfile
 import ydb
 import httpx
 import base64
+import re
 from dotenv import load_dotenv
 from aiogoogle import Aiogoogle
 from aiogoogle.auth.creds import ServiceAccountCreds
@@ -307,9 +308,14 @@ async def get_well_description_ydb(well_number):
 
     loop = asyncio.get_event_loop()
     description = await loop.run_in_executor(None, pool.retry_operation_sync, tx)
-    return description
+    formatted = format_description(description)
+    return formatted
 
-
+def format_description(text: str) -> str:
+    text = re.sub(r'(Работы за прошлые сутки[^\n\r:]*:)', r'🔷 <b>\1</b>', text)
+    text = re.sub(r'(Работы за текущие сутки[^\n\r:]*:)', r'🔵 <b>\1</b>', text)
+    text = re.sub(r'(Проблемные вопросы)', r'<b>\1</b>', text, flags=re.IGNORECASE)
+    return text
 
 
 
