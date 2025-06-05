@@ -177,7 +177,15 @@ async def process_well_selection(callback: CallbackQuery):
             # Получаем описание скважины
             description = await get_well_description_ydb(well_number)
 
-            # Создаем клавиатуру с кнопками возврата
+            # Сообщение с описанием (без клавиатуры)
+            full_text = f"🔹 <b>Скважина {well_number}</b>\n\n📋 Описание работ:\n{description}"
+            parts = split_message(full_text)
+
+            # Отправляем все части описания без клавиатуры
+            for part in parts:
+                await callback.message.answer(part, parse_mode="HTML")
+
+            # Отдельно отправляем клавиатуру с кнопками возврата
             builder = InlineKeyboardBuilder()
             builder.row(
                 InlineKeyboardButton(text="🔙 К списку скважин", callback_data="back_to_wells"),
@@ -186,19 +194,10 @@ async def process_well_selection(callback: CallbackQuery):
             builder.row(
                 InlineKeyboardButton(text="🏠 В начало", callback_data="back_to_start")
             )
-
-            full_text = f"🔹 <b>Скважина {well_number}</b>\n\n📋 Описание работ:\n{description}"
-            parts = split_message(full_text)
-
-            # Удаляем старое сообщение
-            # await callback.message.delete()
-
-            # Отправляем все части, кроме последней, без клавиатуры
-            for part in parts[:-1]:
-                await callback.message.answer(part, parse_mode="HTML")
-
-            # Последнюю часть отправляем с клавиатурой
-            await callback.message.answer(parts[-1], reply_markup=None, parse_mode="HTML")
+            await callback.message.answer(
+                "Выберите действие:",
+                reply_markup=builder.as_markup()
+            )
 
             await callback.answer()
         else:
@@ -206,6 +205,7 @@ async def process_well_selection(callback: CallbackQuery):
     except Exception as e:
         logger.error(f"Error processing well selection: {str(e)}")
         await callback.answer("⚠️ Ошибка при получении описания")
+
 
 
 def get_mode_keyboard():
