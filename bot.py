@@ -305,7 +305,7 @@ async def set_user_message_id(user_id: int, message_id: int):
         query = """
         DECLARE $user_id AS Uint64;
         DECLARE $message_id AS Uint64;
-        UPSERT INTO user_states (user_id, message_id)
+        UPSERT INTO user_state (user_id, message_id)
         VALUES ($user_id, $message_id);
         """
         params = {
@@ -325,7 +325,7 @@ async def get_user_message_id(user_id: int):
     def tx(session):
         query = """
         DECLARE $user_id AS Uint64;
-        SELECT message_id FROM user_states WHERE user_id = $user_id;
+        SELECT message_id FROM user_state WHERE user_id = $user_id;
         """
         params = {"$user_id": user_id}
         result = session.transaction().execute(
