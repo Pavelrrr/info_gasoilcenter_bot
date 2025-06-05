@@ -191,7 +191,7 @@ async def process_well_selection(callback: CallbackQuery):
             parts = split_message(full_text)
 
             # Удаляем старое сообщение
-            await callback.message.delete()
+            # await callback.message.delete()
 
             # Отправляем все части, кроме последней, без клавиатуры
             for part in parts[:-1]:
