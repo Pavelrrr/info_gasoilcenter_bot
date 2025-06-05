@@ -44,12 +44,13 @@ async def get_ydb_key_path():
         return _ydb_key_path
 
     key_json = os.environ.get("YDB_KEY_SA")
-    if key_json:
-        temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
-        temp_file.write(key_json)
-        temp_file.close()
-        _ydb_key_path = temp_file.name
-        return _ydb_key_path
+    if not key_json:
+        raise ValueError("YDB_KEY_SA not set in environment variables")
+    key_json = base64.b64decode(key_json).decode("utf-8")
+    temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
+    temp_file.write(key_json)
+    temp_file.close()
+    return temp_file.name
 
     key_url = os.environ.get("YDB_KEY_SA_URL")
     if key_url:
