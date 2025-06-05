@@ -187,7 +187,7 @@ async def process_well_selection(callback: CallbackQuery):
                 InlineKeyboardButton(text="🏠 В начало", callback_data="back_to_start")
             )
 
-            full_text = f"🔹 Скважина {well_number}\n\n📋 Описание работ:\n{description}"
+            full_text = f"🔹 <b>Скважина {well_number}</b>\n\n📋 Описание работ:\n{description}"
             parts = split_message(full_text)
 
             # Удаляем старое сообщение
@@ -195,10 +195,10 @@ async def process_well_selection(callback: CallbackQuery):
 
             # Отправляем все части, кроме последней, без клавиатуры
             for part in parts[:-1]:
-                await callback.message.answer(part)
+                await callback.message.answer(part, parse_mode="HTML")
 
             # Последнюю часть отправляем с клавиатурой
-            await callback.message.answer(parts[-1], reply_markup=builder.as_markup())
+            await callback.message.answer(parts[-1], reply_markup=builder.as_markup(), parse_mode="HTML")
 
             await callback.answer()
         else:
