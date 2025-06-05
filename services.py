@@ -4,6 +4,7 @@ import asyncio
 import tempfile
 import ydb
 import httpx
+import base64
 from dotenv import load_dotenv
 from aiogoogle import Aiogoogle
 from aiogoogle.auth.creds import ServiceAccountCreds
