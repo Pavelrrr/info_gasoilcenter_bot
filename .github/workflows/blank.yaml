@@ -52,7 +52,7 @@ jobs:
           echo "DRILLING_SHEET_ID=${DRILLING_SHEET_ID}" >> $GITHUB_OUTPUT
           echo "YDB_ENDPOINT=${YDB_ENDPOINT}" >> $GITHUB_OUTPUT
           echo "YDB_DATABASE=${YDB_DATABASE}" >> $GITHUB_OUTPUT
-          echo "YDB_KEY_SA=${YDB_KEY_SA}" >> $GITHUB_OUTPUT
+          echo "${YDB_KEY_SA}" >> $GITHUB_ENV
 
       # Деплой serverless-функции с секретами из Lockbox
       - name: Deploy Function to Yandex Cloud
