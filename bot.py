@@ -159,13 +159,12 @@ async def process_well_selection(callback: CallbackQuery):
             last_msg_id = await get_user_message_id(user_id)
             if last_msg_id:
                 try:
-                    await callback.bot.edit_message_reply_markup(
+                    await callback.bot.delete_message(
                         chat_id=callback.message.chat.id,
-                        message_id=last_msg_id,
-                        reply_markup=None
+                        message_id=last_msg_id
                     )
                 except Exception as e:
-                    logger.warning(f"Не удалось удалить старую клавиатуру: {e}")
+                    logger.warning(f"Не удалось удалить старое сообщение: {e}")
 
             # 2. Получаем описание скважины
             description = await get_well_description_ydb(well_number)
