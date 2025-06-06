@@ -148,6 +148,80 @@ async def process_well_selection(callback: CallbackQuery):
         user_id = callback.from_user.id
         well_number = callback.data
 
+        # Проверяем специальные команды навигации
+        if well_number == "back_to_modes":
+            await callback.message.edit_text(
+                "Выберите режим работы:",
+                reply_markup=get_mode_keyboard()
+            )
+            await callback.answer()
+            return  # <--- обязательно!
+
+        if well_number == "back_to_start":
+            builder = InlineKeyboardBuilder()
+            builder.button(text="🚀 Начать", callback_data="start_bot")
+            await callback.message.edit_text(
+                "🔧 Добро пожаловать в бот для работы со скважинами!\n\n"
+                "Нажмите кнопку ниже для начала работы:",
+                reply_markup=builder.as_markup()
+            )
+            await callback.answer()
+            return  # <--- обязательно!
+
+        # Получаем режим пользователя
+        mode = await get_user_state(user_id)
+
+        if mode:
+            logger.info(f"Processing well selection {well_number} in mode {mode}")
+
+            # 1. Удаляем старую клавиатуру (если message_id сохранён)
+            last_msg_id = await get_user_message_id(user_id)
+            if last_msg_id:
+                try:
+                    await callback.bot.delete_message(
+                        chat_id=callback.message.chat.id,
+                        message_id=last_msg_id
+                    )
+                except Exception as e:
+                    logger.warning(f"Не удалось удалить старое сообщение: {e}")
+
+            # 2. Получаем описание скважины
+            description = await get_well_description_ydb(well_number)
+
+            # 3. Отправляем описание (без клавиатуры)
+            full_text = f"🔹 <b>Скважина {well_number}</b>\n\n📋 Описание работ:\n{description}"
+            parts = split_message(full_text)
+            for part in parts:
+                await callback.message.answer(part, parse_mode="HTML")
+
+            # 4. Отправляем новое сообщение с клавиатурой
+            builder = InlineKeyboardBuilder()
+            builder.row(
+                InlineKeyboardButton(text="🔙 К списку скважин", callback_data="back_to_wells"),
+                InlineKeyboardButton(text="🔄 К выбору режима", callback_data="back_to_modes")
+            )
+            builder.row(
+                InlineKeyboardButton(text="🏠 В начало", callback_data="back_to_start")
+            )
+            keyboard_msg = await callback.message.answer(
+                "Выберите действие:",
+                reply_markup=builder.as_markup()
+            )
+
+            # 5. Сохраняем новый message_id в user_state
+            await set_user_message_id(user_id, keyboard_msg.message_id)
+
+            await callback.answer()
+        else:
+            await callback.answer("Режим не выбран.")
+    except Exception as e:
+        logger.error(f"Error processing well selection: {str(e)}")
+        await callback.answer("⚠️ Ошибка при получении описания")
+
+    try:
+        user_id = callback.from_user.id
+        well_number = callback.data
+
         # ... ваши проверки back_to_modes и back_to_start ...
 
         mode = await get_user_state(user_id)
