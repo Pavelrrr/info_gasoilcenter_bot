@@ -10,6 +10,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from services import set_user_state, get_user_state
 from services import get_well_list_ydb, get_well_description_ydb, get_ydb_pool
 from aiogram.client.default import DefaultBotProperties
+from gpt_client import get_summary
 
 MAX_MESSAGE_LENGTH = 4096
 load_dotenv()
@@ -188,8 +189,19 @@ async def process_well_selection(callback: CallbackQuery):
             # 2. Получаем описание скважины
             description = await get_well_description_ydb(well_number)
 
-            # 3. Отправляем описание (без клавиатуры)
-            full_text = f"🔹 <b>Скважина {well_number}</b>\n\n📋 Описание работ:\n{description}"
+            # 3. Получаем summary через YandexGPT асинхронно
+            summary = await get_summary(description)
+            if summary:
+                full_text = (
+                    f"🔹 <b>Скважина {well_number}</b>\n\n"
+                    f"📝 <b>Краткое summary:</b>\n{summary}"
+                )
+            else:
+                full_text = (
+                    f"🔹 <b>Скважина {well_number}</b>\n\n"
+                    f"📋 Описание работ:\n{description}"
+                )
+
             parts = split_message(full_text)
             for part in parts:
                 logger.info(f"Отправляю описание скважины: {part}")
