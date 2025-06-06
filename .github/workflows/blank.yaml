@@ -55,7 +55,7 @@ jobs:
           echo "YDB_ENDPOINT=${YDB_ENDPOINT}" >> $GITHUB_OUTPUT
           echo "YDB_DATABASE=${YDB_DATABASE}" >> $GITHUB_OUTPUT
           echo "YDB_KEY_SA_B64=$YDB_KEY_SA_B64" >> $GITHUB_ENV
-
+          echo "YANDEX_API_KEY=${{ secrets.YANDEX_API_KEY }}" >> $GITHUB_ENV
       # Деплой serverless-функции с секретами из Lockbox
       - name: Deploy Function to Yandex Cloud
         uses: yc-actions/yc-sls-function@v3
@@ -73,6 +73,7 @@ jobs:
             YDB_ENDPOINT=${{ steps.getlockbox.outputs.YDB_ENDPOINT }}
             YDB_DATABASE=${{ steps.getlockbox.outputs.YDB_DATABASE }}
             YDB_KEY_SA=${{ env.YDB_KEY_SA_B64 }}
+            YANDEX_API_KEY=${{ env.YANDEX_API_KEY }}
           include: |
             .
             requirements.txt
