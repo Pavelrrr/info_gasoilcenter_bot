@@ -3,3 +3,4 @@ httpx==0.27
 aiogoogle==5.11
 ydb[yc]==3.17
 python-dotenv==1.0
+yandex-cloud-ml-sdk
