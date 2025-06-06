@@ -299,42 +299,116 @@ def split_message(text, max_length=4000):
     
     return messages
 
+
+logger = logging.getLogger(__name__)
+
 async def set_user_message_id(user_id: int, message_id: int):
-    pool = await get_ydb_pool()
-    def tx(session):
-        query = """
-        DECLARE $user_id AS Uint64;
-        DECLARE $message_id AS Uint64;
-        UPSERT INTO user_state (user_id, message_id)
-        VALUES ($user_id, $message_id);
-        """
-        params = {
-            "$user_id": user_id,
-            "$message_id": message_id
-        }
-        session.transaction().execute(
-            query,
-            parameters=params,
-            commit_tx=True
-        )
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, pool.retry_operation_sync, tx)
+    """Надёжная запись message_id пользователя в YDB"""
+    try:
+        logger.info(f"Setting message_id={message_id} for user {user_id}")
+        pool = await get_ydb_pool()
+
+        def tx(session):
+            # Method 1: Новый стиль через f-string (без параметров)
+            try:
+                query = f"""
+                UPSERT INTO user_state (user_id, message_id)
+                VALUES ({user_id}, {message_id});
+                """
+                session.transaction().execute(
+                    query,
+                    commit_tx=True
+                )
+                logger.info("Method 1 (f-string) worked")
+                return
+            except Exception as e:
+                logger.warning(f"Method 1 failed: {str(e)}")
+
+            # Method 2: Старый стиль с параметрами
+            try:
+                query = """
+                DECLARE $user_id AS Uint64;
+                DECLARE $message_id AS Uint64;
+                UPSERT INTO user_state (user_id, message_id)
+                VALUES ($user_id, $message_id);
+                """
+                params = {
+                    "$user_id": user_id,
+                    "$message_id": message_id
+                }
+                session.transaction().execute(
+                    query,
+                    parameters=params,
+                    commit_tx=True
+                )
+                logger.info("Method 2 (params) worked")
+                return
+            except Exception as e:
+                logger.warning(f"Method 2 failed: {str(e)}")
+
+            # Method 3: Прямой SQL с экранированием (на всякий случай)
+            query = f"""
+            UPSERT INTO user_state (user_id, message_id)
+            VALUES ({int(user_id)}, {int(message_id)});
+            """
+            session.transaction().execute(
+                query,
+                commit_tx=True
+            )
+            logger.info("Method 3 (fallback) worked")
+
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, pool.retry_operation_sync, tx)
+        logger.info("User message_id saved successfully")
+    except Exception as e:
+        logger.error(f"Error setting user message_id: {str(e)}")
+        raise
 
 async def get_user_message_id(user_id: int):
-    pool = await get_ydb_pool()
-    def tx(session):
-        query = """
-        DECLARE $user_id AS Uint64;
-        SELECT message_id FROM user_state WHERE user_id = $user_id;
-        """
-        params = {"$user_id": user_id}
-        result = session.transaction().execute(
-            query,
-            parameters=params,
-            commit_tx=True
-        )
-        return result[0].rows[0].message_id if result[0].rows else None
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, pool.retry_operation_sync, tx)
+    """Получает message_id пользователя из YDB"""
+    try:
+        logger.info(f"Getting message_id for user {user_id}")
+        pool = await get_ydb_pool()
+
+        def tx(session):
+            # Method 1: f-string (без параметров)
+            try:
+                query = f"""
+                SELECT message_id FROM user_state WHERE user_id = {user_id};
+                """
+                result = session.transaction().execute(
+                    query,
+                    commit_tx=True
+                )
+                if result[0].rows:
+                    logger.info("Method 1 (f-string) worked")
+                    return result[0].rows[0].message_id
+                return None
+            except Exception as e:
+                logger.warning(f"Method 1 failed: {str(e)}")
+
+            # Method 2: параметризованный запрос
+            query = """
+            DECLARE $user_id AS Uint64;
+            SELECT message_id FROM user_state WHERE user_id = $user_id;
+            """
+            params = {"$user_id": user_id}
+            result = session.transaction().execute(
+                query,
+                parameters=params,
+                commit_tx=True
+            )
+            rows = result[0].rows
+            logger.info("Method 2 (params) worked" if rows else "No rows found")
+            return rows[0].message_id if rows else None
+
+        loop = asyncio.get_event_loop()
+        message_id = await loop.run_in_executor(None, pool.retry_operation_sync, tx)
+        logger.info(f"Retrieved message_id: {message_id}")
+        return message_id
+    except Exception as e:
+        logger.error(f"Error getting user message_id: {str(e)}")
+        return None
+
 
 
