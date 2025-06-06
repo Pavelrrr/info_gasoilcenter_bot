@@ -82,7 +82,10 @@ def register_wells_handlers(dp: Dispatcher):
         process_back_to_wells,
         lambda c: c.data == "back_to_wells"
     )
-    
+    dp.callback_query.register(
+    process_summary_request,
+    lambda c: c.data.startswith("summary_")
+    )    
     # Обработчик выбора скважины (все остальные колбэки)
     dp.callback_query.register(process_well_selection)
 
@@ -149,7 +152,6 @@ async def process_well_selection(callback: CallbackQuery):
         user_id = callback.from_user.id
         well_number = callback.data
 
-        # Проверяем специальные команды навигации
         if well_number == "back_to_modes":
             await callback.message.edit_text(
                 "Выберите режим работы:",
@@ -169,13 +171,11 @@ async def process_well_selection(callback: CallbackQuery):
             await callback.answer()
             return
 
-        # Получаем режим пользователя
         mode = await get_user_state(user_id)
 
         if mode:
             logger.info(f"Processing well selection {well_number} in mode {mode}")
 
-            # 1. Удаляем старую клавиатуру (если message_id сохранён)
             last_msg_id = await get_user_message_id(user_id)
             if last_msg_id:
                 try:
@@ -186,29 +186,12 @@ async def process_well_selection(callback: CallbackQuery):
                 except Exception as e:
                     logger.warning(f"Не удалось удалить старое сообщение: {e}")
 
-            # 2. Получаем описание скважины
             description = await get_well_description_ydb(well_number)
 
-            # 3. Получаем summary через YandexGPT асинхронно
-            summary = await get_summary(description)
-            if summary:
-                full_text = (
-                    f"🔹 <b>Скважина {well_number}</b>\n\n"
-                    f"📝 <b>Краткое summary:</b>\n{summary}"
-                )
-            else:
-                full_text = (
-                    f"🔹 <b>Скважина {well_number}</b>\n\n"
-                    f"📋 Описание работ:\n{description}"
-                )
-
-            parts = split_message(full_text)
-            for part in parts:
-                logger.info(f"Отправляю описание скважины: {part}")
-                await callback.message.answer(part, parse_mode="HTML")
-
-            # 4. Отправляем новое сообщение с клавиатурой
             builder = InlineKeyboardBuilder()
+            builder.row(
+                InlineKeyboardButton(text="📝 Краткое summary", callback_data=f"summary_{well_number}")
+            )
             builder.row(
                 InlineKeyboardButton(text="🔙 К списку скважин", callback_data="back_to_wells"),
                 InlineKeyboardButton(text="🔄 К выбору режима", callback_data="back_to_modes")
@@ -216,13 +199,18 @@ async def process_well_selection(callback: CallbackQuery):
             builder.row(
                 InlineKeyboardButton(text="🏠 В начало", callback_data="back_to_start")
             )
-            keyboard_msg = await callback.message.answer(
-                "Выберите действие:",
-                reply_markup=builder.as_markup()
-            )
 
-            # 5. Сохраняем новый message_id в user_state
-            await set_user_message_id(user_id, keyboard_msg.message_id)
+            full_text = (
+                f"🔹 <b>Скважина {well_number}</b>\n\n"
+                f"📋 Описание работ:\n{description}"
+            )
+            parts = split_message(full_text)
+            for idx, part in enumerate(parts):
+                if idx == 0:
+                    msg = await callback.message.answer(part, parse_mode="HTML", reply_markup=builder.as_markup())
+                    await set_user_message_id(user_id, msg.message_id)
+                else:
+                    await callback.message.answer(part, parse_mode="HTML")
 
             await callback.answer()
         else:
@@ -230,6 +218,25 @@ async def process_well_selection(callback: CallbackQuery):
     except Exception as e:
         logger.error(f"Error processing well selection: {str(e)}")
         await callback.answer("⚠️ Ошибка при получении описания")
+
+
+async def process_summary_request(callback: CallbackQuery):
+    try:
+        well_number = callback.data.replace("summary_", "")
+        description = await get_well_description_ydb(well_number)
+        summary = await get_summary(description)
+        if summary:
+            text_to_send = f"🔹 <b>Скважина {well_number}</b>\n\n📝 <b>Краткое summary:</b>\n{summary}"
+        else:
+            text_to_send = "Не удалось получить summary."
+        parts = split_message(text_to_send)
+        for part in parts:
+            await callback.message.answer(part, parse_mode="HTML")
+        await callback.answer()
+    except Exception as e:
+        logger.error(f"Error processing summary request: {str(e)}")
+        await callback.answer("⚠️ Ошибка при получении summary")
+
 
 
 
