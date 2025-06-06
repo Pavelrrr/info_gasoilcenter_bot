@@ -5,7 +5,7 @@ on:
     branches: [ "main" ]
 
 permissions:
-  id-token: write  # Нужно для получения OIDC токена от GitHub
+  id-token: write
 
 jobs:
   deploy:
@@ -15,7 +15,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Получаем OIDC токен от GitHub
       - name: Get OIDC token
         id: oidc
         uses: actions/github-script@v7
@@ -24,18 +23,16 @@ jobs:
             let id_token = await core.getIDToken();
             core.setOutput('id_token', id_token);
 
-      # Меняем OIDC токен на IAM токен Yandex Cloud через федерацию
       - name: Exchange OIDC for Yandex Cloud IAM token
         id: get-iam-token
         run: |
-          SA_ID="${{ secrets.YC_SA_ID }}"  # ID сервисного аккаунта с нужными ролями
+          SA_ID="${{ secrets.YC_SA_ID }}"
           ID_TOKEN="${{ steps.oidc.outputs.id_token }}"
           IAMTOKEN=$(curl -sH "Content-Type: application/x-www-form-urlencoded" \
             -d "grant_type=urn:ietf:params:oauth:grant-type:token-exchange&requested_token_type=urn:ietf:params:oauth:token-type:access_token&audience=$SA_ID&subject_token=$ID_TOKEN&subject_token_type=urn:ietf:params:oauth:token-type:id_token" \
             -X POST https://auth.yandex.cloud/oauth/token | jq -r '.access_token')
           echo "IAMTOKEN=${IAMTOKEN}" >> $GITHUB_OUTPUT
 
-      # Получаем секреты из Lockbox с помощью IAM токена
       - name: Get Lockbox secrets
         id: getlockbox
         run: |
@@ -48,15 +45,19 @@ jobs:
           YDB_ENDPOINT=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="YDB_ENDPOINT") | .textValue')
           YDB_DATABASE=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="YDB_DATABASE") | .textValue')
           YDB_KEY_SA_JSON=$(echo "$SECRET_DATA" | jq -r '.entries[] | select(.key=="YDB_KEY_SA") | .textValue')
-          # Кодируем в base64 для безопасной передачи
           YDB_KEY_SA_B64=$(echo "$YDB_KEY_SA_JSON" | base64 -w 0)
           echo "TELEGRAM_TOKEN=${TELEGRAM_TOKEN}" >> $GITHUB_OUTPUT
           echo "DRILLING_SHEET_ID=${DRILLING_SHEET_ID}" >> $GITHUB_OUTPUT
           echo "YDB_ENDPOINT=${YDB_ENDPOINT}" >> $GITHUB_OUTPUT
           echo "YDB_DATABASE=${YDB_DATABASE}" >> $GITHUB_OUTPUT
           echo "YDB_KEY_SA_B64=$YDB_KEY_SA_B64" >> $GITHUB_ENV
+
+      # Пробрасываем секреты из GitHub Secrets в ENV
+      - name: Export FOLDER_ID and YANDEX_API_KEY to ENV
+        run: |
+          echo "FOLDER_ID=${{ secrets.FOLDER_ID }}" >> $GITHUB_ENV
           echo "YANDEX_API_KEY=${{ secrets.YANDEX_API_KEY }}" >> $GITHUB_ENV
-      # Деплой serverless-функции с секретами из Lockbox
+
       - name: Deploy Function to Yandex Cloud
         uses: yc-actions/yc-sls-function@v3
         with:
@@ -73,6 +74,7 @@ jobs:
             YDB_ENDPOINT=${{ steps.getlockbox.outputs.YDB_ENDPOINT }}
             YDB_DATABASE=${{ steps.getlockbox.outputs.YDB_DATABASE }}
             YDB_KEY_SA=${{ env.YDB_KEY_SA_B64 }}
+            FOLDER_ID=${{ env.FOLDER_ID }}
             YANDEX_API_KEY=${{ env.YANDEX_API_KEY }}
           include: |
             .
