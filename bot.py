@@ -221,21 +221,18 @@ async def process_well_selection(callback: CallbackQuery):
 
 
 async def process_summary_request(callback: CallbackQuery):
-    try:
-        well_number = callback.data.replace("summary_", "")
-        description = await get_well_description_ydb(well_number)
-        summary = await get_summary(description)
-        if summary:
-            text_to_send = f"🔹 <b>Скважина {well_number}</b>\n\n📝 <b>Краткое summary:</b>\n{summary}"
-        else:
-            text_to_send = "Не удалось получить summary."
-        parts = split_message(text_to_send)
-        for part in parts:
-            await callback.message.answer(part, parse_mode="HTML")
-        await callback.answer()
-    except Exception as e:
-        logger.error(f"Error processing summary request: {str(e)}")
-        await callback.answer("⚠️ Ошибка при получении summary")
+    await callback.answer("Генерируем summary, это может занять до 1 минуты...")  # Сразу отвечаем Telegram
+
+    well_number = callback.data.replace("summary_", "")
+    description = await get_well_description_ydb(well_number)
+    summary = await get_summary(description)
+    if summary:
+        text_to_send = f"🔹 <b>Скважина {well_number}</b>\n\n📝 <b>Краткое summary:</b>\n{summary}"
+    else:
+        text_to_send = "Не удалось получить summary."
+    parts = split_message(text_to_send)
+    for part in parts:
+        await callback.message.answer(part, parse_mode="HTML")
 
 
 
