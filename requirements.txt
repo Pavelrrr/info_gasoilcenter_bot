@@ -4,3 +4,4 @@ aiogoogle==5.11
 ydb[yc]==3.17
 python-dotenv==1.0
 yandex-cloud-ml-sdk
+functools == 0.5
