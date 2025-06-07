@@ -221,18 +221,19 @@ async def process_well_selection(callback: CallbackQuery):
 
 
 async def process_summary_request(callback: CallbackQuery):
-    await callback.answer("Генерируем summary, это может занять до 1 минуты...")  # Сразу отвечаем Telegram
-
     well_number = callback.data.replace("summary_", "")
-    description = await get_well_description_ydb(well_number)
-    summary = await get_summary(description)
+    await callback.answer("Генерируем summary...")
+    
+    summary = await get_cached_summary(well_number)
     if summary:
         text_to_send = f"🔹 <b>Скважина {well_number}</b>\n\n📝 <b>Краткое summary:</b>\n{summary}"
     else:
         text_to_send = "Не удалось получить summary."
+    
     parts = split_message(text_to_send)
     for part in parts:
         await callback.message.answer(part, parse_mode="HTML")
+
 
 
 
@@ -444,6 +445,14 @@ async def get_user_message_id(user_id: int):
     except Exception as e:
         logger.error(f"Error getting user message_id: {str(e)}")
         return None
+
+
+@lru_cache(maxsize=32)
+async def get_cached_summary(well_number: str) -> str:
+    """Кэшированная версия получения summary"""
+    description = await get_well_description_ydb_cached(well_number)
+    return await get_summary(description)
+
 
 
 

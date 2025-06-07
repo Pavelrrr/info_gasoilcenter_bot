@@ -48,6 +48,7 @@ def sync_get_summary(text: str) -> str | None:
         return None
 
 async def get_summary(text: str) -> str | None:
+    """Асинхронная обертка для синхронного вызова"""
     try:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, sync_get_summary, text)

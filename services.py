@@ -7,8 +7,6 @@ import httpx
 import base64
 import re
 from dotenv import load_dotenv
-from aiogoogle import Aiogoogle
-from aiogoogle.auth.creds import ServiceAccountCreds
 from utils import download_file
 from datetime import date
 load_dotenv()
@@ -73,42 +71,30 @@ async def get_ydb_pool():
     global ydb_driver, ydb_pool
     if ydb_pool is None:
         try:
-            # Получаем путь к ключу асинхронно
-            key_path = await get_ydb_key_path()
-            
-            # Проверяем, что файл существует и не пустой
-            if not os.path.exists(key_path):
-                raise FileNotFoundError(f"YDB key file not found at {key_path}")
-                
-            with open(key_path, 'r') as f:
-                content = f.read()
-                if not content:
-                    raise ValueError("YDB key file is empty")
-                logger.info(f"YDB key file size: {len(content)} characters")
-            
             # Проверяем переменные окружения
             if not YDB_ENDPOINT:
                 raise ValueError("YDB_ENDPOINT not set")
             if not YDB_DATABASE:
                 raise ValueError("YDB_DATABASE not set")
+            if not YDB_KEY_SA:
+                raise ValueError("YDB_KEY_SA not set")
                 
-            logger.info(f"YDB_ENDPOINT: {YDB_ENDPOINT}")
-            logger.info(f"YDB_DATABASE: {YDB_DATABASE}")
+            # Декодируем ключ из base64
+            key_json = base64.b64decode(YDB_KEY_SA).decode('utf-8')
+            credentials = ydb.iam.ServiceAccountCredentials.from_json(key_json)
             
             # Инициализируем драйвер
-            logger.info("Creating YDB driver...")
             ydb_driver = ydb.Driver(
                 endpoint=YDB_ENDPOINT,
                 database=YDB_DATABASE,
-                credentials=ydb.iam.ServiceAccountCredentials.from_file(key_path)
+                credentials=credentials
             )
             
-            logger.info("Waiting for YDB driver connection...")
-            ydb_driver.wait(timeout=10)  # Увеличиваем timeout
+            # Асинхронное ожидание подключения
+            await asyncio.get_event_loop().run_in_executor(None, ydb_driver.wait, 10)
             
-            logger.info("Creating session pool...")
+            # Создаем пул сессий
             ydb_pool = ydb.SessionPool(ydb_driver)
-            logger.info("YDB pool initialized successfully")
             
         except Exception as e:
             logger.error(f"YDB initialization failed: {str(e)}", exc_info=True)
