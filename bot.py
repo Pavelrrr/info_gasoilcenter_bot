@@ -11,24 +11,21 @@ from services import set_user_state, get_user_state
 from services import get_well_list_ydb, get_well_description_ydb, get_ydb_pool
 from aiogram.client.default import DefaultBotProperties
 from gpt_client import get_summary
+from async_lru import alru_cache
 
 MAX_MESSAGE_LENGTH = 4096
 load_dotenv()
-def split_message(text, max_length=MAX_MESSAGE_LENGTH):
-    # Разбивает текст на части по границе строки или пробела, чтобы не резать слова
+
+def split_message(text: str, max_length: int = MAX_MESSAGE_LENGTH) -> list[str]:
+    """Разбивает текст на части не длиннее max_length"""
     parts = []
-    while text:
-        if len(text) <= max_length:
-            parts.append(text)
-            break
-        part = text[:max_length]
-        last_n = part.rfind('\n')
-        last_sp = part.rfind(' ')
-        split_at = max(last_n, last_sp)
-        if split_at == -1:
-            split_at = max_length
-        parts.append(text[:split_at])
-        text = text[split_at:].lstrip()
+    while len(text) > max_length:
+        split_pos = text.rfind('\n', 0, max_length)
+        if split_pos == -1:
+            split_pos = max_length
+        parts.append(text[:split_pos])
+        text = text[split_pos:]
+    parts.append(text)
     return parts
 
 
@@ -447,9 +444,8 @@ async def get_user_message_id(user_id: int):
         return None
 
 
-@lru_cache(maxsize=32)
+@alru_cache(maxsize=32)
 async def get_cached_summary(well_number: str) -> str:
-    """Кэшированная версия получения summary"""
     description = await get_well_description_ydb_cached(well_number)
     return await get_summary(description)
 

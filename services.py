@@ -9,6 +9,7 @@ import re
 from dotenv import load_dotenv
 from utils import download_file
 from datetime import date
+from functools import lru_cache
 load_dotenv()
 
 
@@ -101,6 +102,11 @@ async def get_ydb_pool():
             raise
     return ydb_pool
 
+@lru_cache(maxsize=32)
+async def get_well_list_ydb_cached(mode: str) -> tuple:
+    """Кэшированная версия получения списка скважин"""
+    today_str = date.today().strftime('%Y-%m-%d')
+    return await _get_well_list_ydb(mode, today_str)
 
 async def set_user_state(user_id, mode):
     """Reliable implementation for setting user state in YDB"""
@@ -254,6 +260,44 @@ async def init_user_state_table():
         else:
             logger.error(f"Error creating user_state table: {str(e)}")
             raise
+
+async def _get_well_list_ydb(mode: str, date_str: str) -> tuple:
+    """Внутренняя функция для получения списка скважин"""
+    pool = await get_ydb_pool()
+    query = f"""
+    SELECT well_number FROM wells WHERE date = DATE('{date_str}')
+    """
+    
+    def tx(session):
+        result = session.transaction().execute(query, commit_tx=True)
+        return tuple(row.well_number for row in result[0].rows)
+    
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, pool.retry_operation_sync, tx)
+
+@lru_cache(maxsize=32)
+async def get_well_description_ydb_cached(well_number: str) -> str:
+    """Кэшированная версия получения описания скважины"""
+    today_str = date.today().strftime('%Y-%m-%d')
+    return await _get_well_description_ydb(well_number, today_str)
+
+async def _get_well_description_ydb(well_number: str, date_str: str) -> str:
+    """Внутренняя функция для получения описания скважины"""
+    pool = await get_ydb_pool()
+    safe_well_number = str(well_number).replace("'", "''")
+    query = f"""
+    SELECT description FROM wells
+    WHERE well_number = '{safe_well_number}' AND date = DATE('{date_str}')
+    """
+    
+    def tx(session):
+        result = session.transaction().execute(query, commit_tx=True)
+        rows = result[0].rows
+        return rows[0].description if rows else "Скважина не найдена"
+    
+    loop = asyncio.get_event_loop()
+    description = await loop.run_in_executor(None, pool.retry_operation_sync, tx)
+    return format_description(description)
 
 async def get_well_list_ydb(mode):
     """
