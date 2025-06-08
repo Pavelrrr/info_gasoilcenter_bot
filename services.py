@@ -3,6 +3,7 @@ import logging
 import asyncio
 import tempfile
 import ydb
+import ydb.iam
 import httpx
 import base64
 import re
@@ -79,11 +80,15 @@ async def get_ydb_pool():
                 raise ValueError("YDB_DATABASE not set")
             if not YDB_KEY_SA:
                 raise ValueError("YDB_KEY_SA not set")
-                
-            # Декодируем ключ из base64
+
+            # Декодируем ключ из base64 и сохраняем во временный файл
             key_json = base64.b64decode(YDB_KEY_SA).decode('utf-8')
-            credentials = ydb.iam.ServiceAccountCredentials.from_json(key_json)
             
+            with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp:
+                tmp.write(key_json)
+                tmp.flush()
+                credentials = ydb.iam.ServiceAccountCredentials.from_file(tmp.name)
+
             # Инициализируем драйвер
             ydb_driver = ydb.Driver(
                 endpoint=YDB_ENDPOINT,
