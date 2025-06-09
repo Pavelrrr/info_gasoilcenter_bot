@@ -25,7 +25,8 @@ def sync_get_summary(text: str) -> str | None:
             folder_id=FOLDER_ID,
             auth=APIKeyAuth(YANDEX_API_KEY)
         )
-        model = sdk.models.completions("yandexgpt")
+        model = sdk.models.completions("yandexgpt",  model_version="rc")
+        model = model.configure(temperature=0)
         prompt = (
             "Ты специалист по бурению нефтяных и газовых скважин. "
             "Суммируй текст кратко и по делу:\n"
